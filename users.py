@@ -1,38 +1,53 @@
 """Модуль, содержащий маршруты для работы с пользователями."""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Form
+from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from starlette.requests import Request
 import crud
 import schemas
 import database
+import os
 
 router = APIRouter()
 
-@router.post("/", response_model=schemas.UserOut)
-def create_user(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
+# Настройка шаблонов
+templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
+
+@router.get("/create", response_class=HTMLResponse)
+def create_user_form(request: Request):
+    """Страница для создания нового пользователя."""
+    return templates.TemplateResponse("create_user.html", {"request": request})
+
+@router.post("/create", response_class=RedirectResponse)
+def create_user(username: str = Form(...), email: str = Form(...), password: str = Form(...), db: Session = Depends(database.get_db)):
     """Функция для создания нового пользователя."""
-    return crud.create_user(db, user)
+    user = schemas.UserCreate(username=username, email=email, password=password)
+    crud.create_user(db, user)
+    return RedirectResponse(url="/users/", status_code=303)
 
-@router.get("/", response_model=list[schemas.UserOut])
-def list_users(db: Session = Depends(database.get_db)):
-    """Функция для получения списка всех пользователей."""
-    return crud.get_users(db)
+@router.get("/", response_class=HTMLResponse)
+def list_users(request: Request, db: Session = Depends(database.get_db)):
+    """Страница для отображения всех пользователей."""
+    users = crud.get_users(db)
+    return templates.TemplateResponse("list_users.html", {"request": request, "users": users})
 
-@router.post("/bulk", response_model=list[schemas.UserOut])
-def create_multiple_users(users: list[schemas.UserCreate], db: Session = Depends(database.get_db)):
-    """Функция для добавления нескольких пользователей."""
-    return crud.add_multiple_users(db, users)
+@router.get("/edit/{user_id}", response_class=HTMLResponse)
+def edit_user_form(request: Request, user_id: int, db: Session = Depends(database.get_db)):
+    """Страница для редактирования пользователя."""
+    user = crud.get_user_by_id(db, user_id)
+    return templates.TemplateResponse("edit_user.html", {"request": request, "user": user})
 
-@router.get("/all", response_model=list[schemas.UserOut])
-def get_all_users(db: Session = Depends(database.get_db)):
-    """Функция для получения всех пользователей."""
-    return crud.get_all_users(db)
+@router.post("/edit/{user_id}", response_class=RedirectResponse)
+def edit_user(user_id: int, username: str = Form(...), email: str = Form(...), password: str = Form(...), db: Session = Depends(database.get_db)):
+    """Функция для обновления данных пользователя."""
+    user = schemas.UserCreate(username=username, email=email, password=password)
+    crud.update_user(db, user_id, user)
+    return RedirectResponse(url="/users/", status_code=303)
 
-@router.put("/{user_id}/email")
-def update_user_email(user_id: int, new_email: str, db: Session = Depends(database.get_db)):
-    """Функция для обновления email пользователя."""
-    return crud.update_user_email(db, user_id, new_email)
-
-@router.delete("/{user_id}")
+@router.get("/delete/{user_id}", response_class=RedirectResponse)
 def delete_user(user_id: int, db: Session = Depends(database.get_db)):
     """Функция для удаления пользователя и его постов."""
-    return crud.delete_user_and_posts(db, user_id)
+    crud.delete_user_and_posts(db, user_id)
+    return RedirectResponse(url="/users/", status_code=303)

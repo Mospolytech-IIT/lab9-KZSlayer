@@ -52,6 +52,20 @@ def delete_user_and_posts(db: Session, user_id: int):
         db.delete(db_user)
         db.commit()
     return db_user
+
+def get_user_by_id(db: Session, user_id: int):
+    """Функция для получения пользователя по ID."""
+    return db.query(models.User).filter(models.User.id == user_id).first()
+
+def update_user(db: Session, user_id: int, new_email: str):
+    """Функция для обновления email пользователя."""
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user:
+        user.email = new_email
+        db.commit()
+        db.refresh(user)
+        return user
+    return None
 # CRUD для постов
 def create_post(db: Session, post: schemas.PostCreate):
     """Функция для создания нового Post."""
@@ -90,3 +104,7 @@ def delete_post(db: Session, post_id: int):
         db.delete(db_post)
         db.commit()
     return db_post
+
+def get_post_by_id(db: Session, post_id: int):
+    """Функция для получения поста по ID."""
+    return db.query(models.Post).filter(models.Post.id == post_id).first()
